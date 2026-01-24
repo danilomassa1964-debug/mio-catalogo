@@ -1,72 +1,61 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <title>Catalogo PDF</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+    const url = './documento.pdf'; 
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-    <style>
-        body { background-color: #333; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; }
-        #flipbook { display: none; margin: auto; }
-        .page { background-color: white; }
-        canvas { width: 100%; height: 100%; }
-        #loading { color: white; }
-    </style>
-</head>
-<body>
+    async function loadBook() {
+        try {
+            const pdf = await pdfjsLib.getDocument(url).promise;
+            const container = document.getElementById('flipbook');
+            const totalPages = pdf.numPages;
 
-    <div id="loading">Caricamento in corso... <span id="percent">0</span>%</div>
-    <div id="flipbook"></div>
+            // Prendiamo la prima pagina per calcolare le proporzioni
+            const firstPage = await pdf.getPage(1);
+            const originalViewport = firstPage.getViewport({ scale: 1.0 });
+            
+            // CALCOLO SCALA (Per far stare due pagine nello schermo)
+            const scale = Math.min(800 / originalViewport.height, 500 / originalViewport.width);
 
-    <script>
-        const url =window.location.href.replace('index.html', '') + 'documento.pdf';
-        const pdfjsLib = window['pdfjs-dist/build/pdf'];
-        // Impostiamo il worker corretto per la versione 2.16
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+            for (let i = 1; i <= totalPages; i++) {
+                const page = await pdf.getPage(i);
+                const viewport = page.getPage(i).getViewport({ scale: scale }); // Usiamo la scala calcolata
+                
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'page';
+                
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
 
-        async function start() {
-            try {
-                const loadingTask = pdfjsLib.getDocument(url);
-                const pdf = await loadingTask.promise;
-                const container = document.getElementById('flipbook');
+                pageDiv.appendChild(canvas);
+                container.appendChild(pageDiv);
 
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const viewport = page.getViewport({ scale: 1.0 }); // Scala ridotta per stabilità
-                    
-                    const pageDiv = document.createElement('div');
-                    pageDiv.className = 'page';
-                    
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-
-                    pageDiv.appendChild(canvas);
-                    container.appendChild(pageDiv);
-
-                    await page.render({ canvasContext: context, viewport: viewport }).promise;
-                    document.getElementById('percent').innerText = Math.round((i / pdf.numPages) * 100);
-                }
-
-                document.getElementById('loading').style.display = 'none';
-                $('#flipbook').show().turn({
-                    width: container.querySelector('canvas').width * 2,
-                    height: container.querySelector('canvas').height,
-                    autoCenter: true,
-                    acceleration: true
-                });
-
-            } catch (err) {
-                console.error("Errore PDF:", err);
-                document.getElementById('loading').innerText = "Errore: il PDF non può essere letto. Controlla il nome del file.";
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                document.getElementById('percent').innerText = Math.round((i / totalPages) * 100);
             }
+
+            document.getElementById('loading').style.display = 'none';
+            
+            // ATTIVAZIONE MANUALE E FORZATA
+            $(container).fadeIn().turn({
+                width: (originalViewport.width * scale) * 2,
+                height: originalViewport.height * scale,
+                autoCenter: true,
+                display: 'double', // Obbligatorio per vedere le pagine affiancate
+                acceleration: true,
+                gradients: true,
+                elevation: 50,
+                when: {
+                    turning: function(e, page) { console.log('Sto andando alla pagina: ' + page); }
+                }
+            });
+
+        } catch (err) {
+            console.error("Errore:", err);
+            document.getElementById('loading').innerHTML = "Errore durante la creazione delle pagine.";
         }
+    }
 
-        start();
-    </script>
-</body>
-</html>
-
+    loadBook();
+</script>
