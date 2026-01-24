@@ -3,84 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <title>Catalogo Sfogliabile</title>
-    
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
+    <script src="https://rawcdn.githack.com/blasten/turn.js/master/lib/turn.min.js"></script>
 
     <style>
-        body { background-color: #333; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; overflow: hidden; }
-        #flipbook { display: none; margin: auto; }
-        .page { background-color: white; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        body { background-color: #222; margin: 0; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; color: white; }
+        #flipbook { margin: 20px auto; display: none; }
+        .page { background-color: white; }
         canvas { width: 100%; height: 100%; }
-        #loading { color: white; position: absolute; z-index: 10; }
+        .controls { margin-top: 20px; }
+        button { padding: 10px 20px; cursor: pointer; background: #444; color: white; border: 1px solid #666; border-radius: 5px; margin: 0 10px; }
+        button:hover { background: #666; }
+        #loading { margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-    <div id="loading">Caricamento PDF... <span id="percent">0</span>%</div>
+    <div id="loading">Caricamento PDF: <span id="percent">0</span>%</div>
+    
     <div id="flipbook"></div>
 
- <script>
-    $(window).on('load', function() {
-        const url = './documento.pdf'; 
-        const pdfjsLib = window['pdfjs-dist/build/pdf'];
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    <div class="controls">
+        <button onclick="$('#flipbook').turn('previous')">Indietro</button>
+        <button onclick="$('#flipbook').turn('next')">Avanti</button>
+    </div>
 
-        async function start() {
-            try {
-                const pdf = await pdfjsLib.getDocument(url).promise;
-                const container = document.getElementById('flipbook');
-                const totalPages = pdf.numPages;
+    <script>
+        $(window).on('load', function() {
+            const url = './documento.pdf';
+            const pdfjsLib = window['pdfjs-dist/build/pdf'];
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-                for (let i = 1; i <= totalPages; i++) {
-                    const page = await pdf.getPage(i);
-                    // SCALA RIDOTTA: usiamo 0.8 per essere sicuri che stia nello schermo
-                    const viewport = page.getViewport({ scale: 0.8 });
+            async function init() {
+                try {
+                    const pdf = await pdfjsLib.getDocument(url).promise;
+                    const container = document.getElementById('flipbook');
+
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        // Usiamo una scala fissa più piccola per evitare blocchi
+                        const viewport = page.getViewport({ scale: 0.7 });
+                        
+                        const pageDiv = document.createElement('div');
+                        pageDiv.className = 'page';
+                        const canvas = document.createElement('canvas');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        pageDiv.appendChild(canvas);
+                        container.appendChild(pageDiv);
+
+                        await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+                        document.getElementById('percent').innerText = Math.round((i / pdf.numPages) * 100);
+                    }
+
+                    $('#loading').hide();
+                    const firstCanvas = container.querySelector('canvas');
                     
-                    const pageDiv = document.createElement('div');
-                    pageDiv.className = 'page';
-                    
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
+                    // Inizializzazione con misure forzate
+                    $(container).show().turn({
+                        width: firstCanvas.width * 2,
+                        height: firstCanvas.height,
+                        autoCenter: true,
+                        display: 'double',
+                        acceleration: true,
+                        elevation: 50
+                    });
 
-                    pageDiv.appendChild(canvas);
-                    container.appendChild(pageDiv);
-
-                    await page.render({ canvasContext: context, viewport: viewport }).promise;
-                    document.getElementById('percent').innerText = Math.round((i / totalPages) * 100);
+                } catch (e) {
+                    $('#loading').text("Errore caricamento: controlla che il file si chiami documento.pdf");
                 }
-
-                $('#loading').hide();
-                
-                // Prendiamo le misure finali dal canvas
-                const canvasWidth = container.querySelector('canvas').width;
-                const canvasHeight = container.querySelector('canvas').height;
-
-                // INIZIALIZZAZIONE FORZATA
-                $(container).show().turn({
-                    width: canvasWidth * 2, // Due pagine
-                    height: canvasHeight,
-                    autoCenter: true,
-                    display: 'double',
-                    acceleration: true,
-                    gradients: true,
-                    elevation: 50, // Questo crea l'area cliccabile negli angoli
-                    duration: 1000 // Velocità dell'animazione
-                });
-
-                // TRUCCO FINALE: Forza un refresh del layout dopo mezzo secondo
-                setTimeout(function() {
-                    $(container).turn('size', canvasWidth * 2, canvasHeight);
-                }, 500);
-
-            } catch (e) {
-                console.error(e);
-                document.getElementById('loading').innerText = "Errore nel caricamento.";
             }
-        }
-        start();
-    });
-</script>
+            init();
+        });
+    </script>
+</body>
+</html>
