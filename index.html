@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Mio Catalogo PDF</title>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://rawcdn.githack.com/blasten/turn.js/master/lib/turn.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+    <style>
+        body { background-color: #333; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        
+        /* Contenitore del catalogo */
+        #flipbook {
+            display: none; /* Resta nascosto finché il PDF non è caricato */
+        }
+
+        /* Stile delle pagine */
+        .page {
+            background-color: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        #loading { color: white; font-family: sans-serif; }
+    </style>
+</head>
+<body>
+
+    <div id="loading">Caricamento catalogo...</div>
+    <div id="flipbook"></div>
+
+    <script>
+        // Configurazione PDF.js
+        const url = 'documento.pdf'; // ASSICURATI CHE IL NOME SIA CORRETTO
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        async function initCatalogo() {
+            try {
+                const pdf = await pdfjsLib.getDocument(url).promise;
+                const container = document.getElementById('flipbook');
+
+                // Ciclo per creare ogni pagina del PDF
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page';
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    pageDiv.appendChild(canvas);
+                    container.appendChild(pageDiv);
+
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                }
+
+                // Nascondi scritta loading e mostra catalogo
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('flipbook').style.display = 'block';
+
+                // Attiva Turn.js
+                $('#flipbook').turn({
+                    width: 1000,
+                    height: 700,
+                    autoCenter: true,
+                    gradients: true
+                });
+
+            } catch (error) {
+                console.error("Errore caricamento:", error);
+                document.getElementById('loading').innerText = "Errore: il PDF non è stato trovato o c'è un problema di permessi.";
+            }
+        }
+
+        initCatalogo();
+    </script>
+</body>
+</html>
