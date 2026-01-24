@@ -21,7 +21,7 @@
     <div id="flipbook"></div>
 
     <script>
-        const url = 'documento.pdf'; 
+        const url =window.location.href.replace('index.html', '') + 'documento.pdf';
         const pdfjsLib = window['pdfjs-dist/build/pdf'];
         // Impostiamo il worker corretto per la versione 2.16
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
@@ -69,3 +69,4 @@
     </script>
 </body>
 </html>
+
