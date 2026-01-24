@@ -2,50 +2,39 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Catalogo PDF Sfogliabile</title>
-    
+    <title>Catalogo PDF</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 
     <style>
-        body { background-color: #444; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow-x: hidden; }
-        
-        #flipbook {
-            display: none; /* Apparirà al termine del caricamento */
-            margin: auto;
-        }
-
-        .page {
-            background-color: white;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-        }
-
+        body { background-color: #333; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; }
+        #flipbook { display: none; margin: auto; }
+        .page { background-color: white; }
         canvas { width: 100%; height: 100%; }
-
-        #loading { color: white; font-family: sans-serif; position: absolute; }
+        #loading { color: white; }
     </style>
 </head>
 <body>
 
-    <div id="loading">Caricamento pagine... <span id="percent">0</span>%</div>
+    <div id="loading">Caricamento in corso... <span id="percent">0</span>%</div>
     <div id="flipbook"></div>
 
     <script>
-        const url = 'documento.pdf'; // ASSICURATI CHE IL NOME SIA ESATTO
+        const url = 'documento.pdf'; 
         const pdfjsLib = window['pdfjs-dist/build/pdf'];
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        // Impostiamo il worker corretto per la versione 2.16
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-        async function init() {
+        async function start() {
             try {
-                const pdf = await pdfjsLib.getDocument(url).promise;
+                const loadingTask = pdfjsLib.getDocument(url);
+                const pdf = await loadingTask.promise;
                 const container = document.getElementById('flipbook');
-                const totalPages = pdf.numPages;
 
-                for (let i = 1; i <= totalPages; i++) {
+                for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
-                    // Usiamo una scala fissa per avere pagine uniformi
-                    const viewport = page.getViewport({ scale: 1.2 });
+                    const viewport = page.getViewport({ scale: 1.0 }); // Scala ridotta per stabilità
                     
                     const pageDiv = document.createElement('div');
                     pageDiv.className = 'page';
@@ -59,41 +48,24 @@
                     container.appendChild(pageDiv);
 
                     await page.render({ canvasContext: context, viewport: viewport }).promise;
-                    
-                    // Aggiorna percentuale
-                    document.getElementById('percent').innerText = Math.round((i / totalPages) * 100);
+                    document.getElementById('percent').innerText = Math.round((i / pdf.numPages) * 100);
                 }
 
-                // Una volta caricate tutte le pagine, impostiamo le dimensioni del libro
-                // Prendiamo le misure dal primo canvas creato
-                const firstCanvas = container.querySelector('canvas');
-                const bookWidth = firstCanvas.width * 2; // Due pagine affiancate
-                const bookHeight = firstCanvas.height;
-
                 document.getElementById('loading').style.display = 'none';
-                $(container).show();
-
-                // INIZIALIZZAZIONE TURN.JS
-                $(container).turn({
-                    width: bookWidth,
-                    height: bookHeight,
+                $('#flipbook').show().turn({
+                    width: container.querySelector('canvas').width * 2,
+                    height: container.querySelector('canvas').height,
                     autoCenter: true,
-                    acceleration: true,
-                    gradients: true,
-                    elevation: 50,
-                    // Evento per debuggare se si attiva
-                    when: {
-                        turned: function(e, page) { console.log('Pagina attuale:', page); }
-                    }
+                    acceleration: true
                 });
 
-            } catch (e) {
-                console.error(e);
-                document.getElementById('loading').innerText = "Errore critico: verifica il nome del file PDF.";
+            } catch (err) {
+                console.error("Errore PDF:", err);
+                document.getElementById('loading').innerText = "Errore: il PDF non può essere letto. Controlla il nome del file.";
             }
         }
 
-        init();
+        start();
     </script>
 </body>
 </html>
