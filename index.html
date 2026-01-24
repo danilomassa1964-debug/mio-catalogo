@@ -21,65 +21,66 @@
     <div id="loading">Caricamento PDF... <span id="percent">0</span>%</div>
     <div id="flipbook"></div>
 
-    <script>
-        // Funzione per inizializzare tutto solo quando le librerie sono pronte
-        $(window).on('load', function() {
-            const url = './documento.pdf'; 
-            
-            // Verifichiamo che PDF.js sia caricato correttamente
-            const pdfjsLib = window['pdfjs-dist/build/pdf'];
-            if (!pdfjsLib) {
-                document.getElementById('loading').innerText = "Errore: Libreria PDF non caricata.";
-                return;
-            }
+ <script>
+    $(window).on('load', function() {
+        const url = './documento.pdf'; 
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        async function start() {
+            try {
+                const pdf = await pdfjsLib.getDocument(url).promise;
+                const container = document.getElementById('flipbook');
+                const totalPages = pdf.numPages;
 
-            async function start() {
-                try {
-                    const pdf = await pdfjsLib.getDocument(url).promise;
-                    const container = document.getElementById('flipbook');
-                    const totalPages = pdf.numPages;
-
-                    for (let i = 1; i <= totalPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const viewport = page.getViewport({ scale: 1.2 });
-                        
-                        const pageDiv = document.createElement('div');
-                        pageDiv.className = 'page';
-                        
-                        const canvas = document.createElement('canvas');
-                        const context = canvas.getContext('2d');
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
-
-                        pageDiv.appendChild(canvas);
-                        container.appendChild(pageDiv);
-
-                        await page.render({ canvasContext: context, viewport: viewport }).promise;
-                        document.getElementById('percent').innerText = Math.round((i / totalPages) * 100);
-                    }
-
-                    $('#loading').hide();
+                for (let i = 1; i <= totalPages; i++) {
+                    const page = await pdf.getPage(i);
+                    // SCALA RIDOTTA: usiamo 0.8 per essere sicuri che stia nello schermo
+                    const viewport = page.getViewport({ scale: 0.8 });
                     
-                    const firstCanvas = container.querySelector('canvas');
-                    $(container).show().turn({
-                        width: firstCanvas.width * 2,
-                        height: firstCanvas.height,
-                        autoCenter: true,
-                        display: 'double',
-                        acceleration: true,
-                        gradients: true
-                    });
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page';
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
 
-                } catch (e) {
-                    console.error(e);
-                    document.getElementById('loading').innerText = "Errore nel caricamento del file documento.pdf";
+                    pageDiv.appendChild(canvas);
+                    container.appendChild(pageDiv);
+
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    document.getElementById('percent').innerText = Math.round((i / totalPages) * 100);
                 }
-            }
 
-            start();
-        });
-    </script>
-</body>
-</html>
+                $('#loading').hide();
+                
+                // Prendiamo le misure finali dal canvas
+                const canvasWidth = container.querySelector('canvas').width;
+                const canvasHeight = container.querySelector('canvas').height;
+
+                // INIZIALIZZAZIONE FORZATA
+                $(container).show().turn({
+                    width: canvasWidth * 2, // Due pagine
+                    height: canvasHeight,
+                    autoCenter: true,
+                    display: 'double',
+                    acceleration: true,
+                    gradients: true,
+                    elevation: 50, // Questo crea l'area cliccabile negli angoli
+                    duration: 1000 // Velocità dell'animazione
+                });
+
+                // TRUCCO FINALE: Forza un refresh del layout dopo mezzo secondo
+                setTimeout(function() {
+                    $(container).turn('size', canvasWidth * 2, canvasHeight);
+                }, 500);
+
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loading').innerText = "Errore nel caricamento.";
+            }
+        }
+        start();
+    });
+</script>
