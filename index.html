@@ -2,21 +2,20 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Mio Catalogo PDF</title>
+    <title>Mio Catalogo Sfogliabile</title>
     
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://rawcdn.githack.com/blasten/turn.js/master/lib/turn.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
     <style>
-        body { background-color: #333; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        body { background-color: #333; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; }
         
-        /* Contenitore del catalogo */
         #flipbook {
-            display: none; /* Resta nascosto finché il PDF non è caricato */
+            margin: auto;
+            display: none; /* Nascondiamo finchÃ© non Ã¨ pronto */
         }
 
-        /* Stile delle pagine */
         .page {
             background-color: white;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
@@ -27,17 +26,16 @@
             height: 100%;
         }
 
-        #loading { color: white; font-family: sans-serif; }
+        #loading { color: white; margin-bottom: 20px; }
     </style>
 </head>
 <body>
 
-    <div id="loading">Caricamento catalogo...</div>
+    <div id="loading">Preparazione pagine in corso... attendere.</div>
     <div id="flipbook"></div>
 
     <script>
-        // Configurazione PDF.js
-        const url = 'documento.pdf'; // ASSICURATI CHE IL NOME SIA CORRETTO
+        const url = 'documento.pdf'; // Verifica che il nome file sia identico
         const pdfjsLib = window['pdfjs-dist/build/pdf'];
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -46,7 +44,7 @@
                 const pdf = await pdfjsLib.getDocument(url).promise;
                 const container = document.getElementById('flipbook');
 
-                // Ciclo per creare ogni pagina del PDF
+                // 1. Generiamo tutte le pagine
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
                     const viewport = page.getViewport({ scale: 1.5 });
@@ -65,21 +63,29 @@
                     await page.render({ canvasContext: context, viewport: viewport }).promise;
                 }
 
-                // Nascondi scritta loading e mostra catalogo
+                // 2. Mostriamo il contenitore
                 document.getElementById('loading').style.display = 'none';
-                document.getElementById('flipbook').style.display = 'block';
+                $("#flipbook").show();
 
-                // Attiva Turn.js
-                $('#flipbook').turn({
-                    width: 1000,
-                    height: 700,
-                    autoCenter: true,
-                    gradients: true
-                });
+                // 3. ATTIVIAMO TURN.JS con un piccolo ritardo per sicurezza
+                setTimeout(function() {
+                    $("#flipbook").turn({
+                        width: 1000,
+                        height: 700,
+                        autoCenter: true,
+                        gradients: true,
+                        acceleration: true,
+                        when: {
+                            turning: function(event, page, view) {
+                                console.log("Voltando pagina...");
+                            }
+                        }
+                    });
+                }, 500);
 
             } catch (error) {
-                console.error("Errore caricamento:", error);
-                document.getElementById('loading').innerText = "Errore: il PDF non è stato trovato o c'è un problema di permessi.";
+                console.error("Errore:", error);
+                document.getElementById('loading').innerText = "Errore nel caricamento del PDF.";
             }
         }
 
