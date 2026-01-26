@@ -49,7 +49,7 @@
         <button onclick="changeZoom(0.1)">➕ Ingrandisci</button>
         <button onclick="$('#flipbook').turn('previous')">← Prec</button>
         <button onclick="$('#flipbook').turn('next')">Succ →</button>
-        <a href="./documento.pdf" download="catalogo.pdf" class="btn-link btn-download">⬇️ Scarica PDF</a>
+        <button onclick="downloadPDF()" class="btn-download">⬇️ Scarica PDF</button>
     </div>
 
     <div id="loading">Caricamento: <span id="percent">0</span>%</div>
@@ -71,7 +71,14 @@
             if (currentZoom > 2.0) currentZoom = 2.0;
             document.getElementById('canvas-container').style.transform = `scale(${currentZoom})`;
         }
-
+function downloadPDF() {
+    const link = document.createElement('a');
+    link.href = './documento.pdf';
+    link.download = 'Catalogo.pdf'; // Il nome che vedrà l'utente al download
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
         async function renderPDF() {
             try {
                 const pdf = await pdfjsLib.getDocument(url).promise;
@@ -117,3 +124,4 @@
     </script>
 </body>
 </html>
+
