@@ -2,80 +2,109 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Catalogo Sfogliabile</title>
+    <title>Catalogo Finale</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <script src="https://rawcdn.githack.com/blasten/turn.js/master/lib/turn.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
 
     <style>
-        body { background-color: #222; margin: 0; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; color: white; }
-        #flipbook { margin: 20px auto; display: none; }
-        .page { background-color: white; }
-        canvas { width: 100%; height: 100%; }
-        .controls { margin-top: 20px; }
-        button { padding: 10px 20px; cursor: pointer; background: #444; color: white; border: 1px solid #666; border-radius: 5px; margin: 0 10px; }
-        button:hover { background: #666; }
-        #loading { margin-bottom: 10px; }
+        /* CSS FORZATO PER EVITARE IMMAGINI SOVRAPPOSTE */
+        body { background-color: #1a1a1a; color: white; text-align: center; font-family: sans-serif; margin: 0; padding: 20px; }
+        
+        #canvas-container { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+        }
+
+        #flipbook { 
+            display: none; /* Nascondiamo la lista finché turn.js non la trasforma in libro */
+            margin: 0 auto;
+        }
+
+        .page { background-color: white; width: 400px; height: 600px; }
+
+        .controls { 
+            margin-top: 20px; 
+            display: block !important; /* Forza la visibilità dei tasti */
+        }
+
+        button { 
+            padding: 15px 30px; 
+            font-size: 18px; 
+            background: #ff4444; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer;
+            margin: 5px;
+        }
     </style>
 </head>
 <body>
 
-    <div id="loading">Caricamento PDF: <span id="percent">0</span>%</div>
+    <div id="loading">Caricamento pagine: <span id="percent">0</span>%</div>
     
-    <div id="flipbook"></div>
+    <div id="canvas-container">
+        <div id="flipbook"></div>
+    </div>
 
     <div class="controls">
-        <button onclick="$('#flipbook').turn('previous')">Indietro</button>
-        <button onclick="$('#flipbook').turn('next')">Avanti</button>
+        <button id="prevBtn">← PREC</button>
+        <button id="nextBtn">SUCC →</button>
     </div>
 
     <script>
-        $(window).on('load', function() {
-            const url = './documento.pdf';
-            const pdfjsLib = window['pdfjs-dist/build/pdf'];
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        const url = './documento.pdf';
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-            async function init() {
-                try {
-                    const pdf = await pdfjsLib.getDocument(url).promise;
-                    const container = document.getElementById('flipbook');
+        async function renderPDF() {
+            try {
+                const pdf = await pdfjsLib.getDocument(url).promise;
+                const fb = $('#flipbook');
 
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        // Usiamo una scala fissa più piccola per evitare blocchi
-                        const viewport = page.getViewport({ scale: 0.7 });
-                        
-                        const pageDiv = document.createElement('div');
-                        pageDiv.className = 'page';
-                        const canvas = document.createElement('canvas');
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
-                        pageDiv.appendChild(canvas);
-                        container.appendChild(pageDiv);
-
-                        await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
-                        document.getElementById('percent').innerText = Math.round((i / pdf.numPages) * 100);
-                    }
-
-                    $('#loading').hide();
-                    const firstCanvas = container.querySelector('canvas');
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const viewport = page.getViewport({ scale: 0.8 });
                     
-                    // Inizializzazione con misure forzate
-                    $(container).show().turn({
-                        width: firstCanvas.width * 2,
-                        height: firstCanvas.height,
-                        autoCenter: true,
-                        display: 'double',
-                        acceleration: true,
-                        elevation: 50
-                    });
+                    const pageDiv = $('<div class="page"></div>');
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    
+                    pageDiv.append(canvas);
+                    fb.append(pageDiv);
 
-                } catch (e) {
-                    $('#loading').text("Errore caricamento: controlla che il file si chiami documento.pdf");
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+                    $('#percent').text(Math.round((i / pdf.numPages) * 100));
                 }
+
+                $('#loading').hide();
+                
+                // INIZIALIZZIAMO IL LIBRO
+                const w = fb.find('canvas')[0].width;
+                const h = fb.find('canvas')[0].height;
+
+                fb.show().turn({
+                    width: w * 2,
+                    height: h,
+                    autoCenter: true,
+                    display: 'double',
+                    acceleration: true
+                });
+
+                // AGGANCIO BOTTONI
+                $('#prevBtn').on('click', function() { $('#flipbook').turn('previous'); });
+                $('#nextBtn').on('click', function() { $('#flipbook').turn('next'); });
+
+            } catch (err) {
+                console.error(err);
+                $('#loading').text("Errore. Verifica che il file si chiami documento.pdf");
             }
-            init();
-        });
+        }
+
+        $(document).ready(renderPDF);
     </script>
 </body>
 </html>
