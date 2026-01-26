@@ -2,62 +2,75 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Catalogo Finale</title>
+    <title>Catalogo Interattivo</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
 
     <style>
-        /* CSS FORZATO PER EVITARE IMMAGINI SOVRAPPOSTE */
-        body { background-color: #1a1a1a; color: white; text-align: center; font-family: sans-serif; margin: 0; padding: 20px; }
+        body { background-color: #1a1a1a; color: white; text-align: center; font-family: sans-serif; margin: 0; overflow: hidden; }
         
+        /* Toolbar Superiore */
+        .toolbar {
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            position: fixed;
+            top: 0; width: 100%;
+            z-index: 1000;
+            display: flex; justify-content: center; gap: 10px;
+        }
+
         #canvas-container { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
+            margin-top: 60px;
+            transition: transform 0.3s ease; /* Per lo zoom fluido */
+            transform-origin: center top;
         }
 
-        #flipbook { 
-            display: none; /* Nascondiamo la lista finché turn.js non la trasforma in libro */
-            margin: 0 auto;
-        }
+        #flipbook { margin: 0 auto; display: none; }
+        .page { background-color: white; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        canvas { width: 100%; height: 100%; }
 
-        .page { background-color: white; width: 400px; height: 600px; }
-
-        .controls { 
-            margin-top: 20px; 
-            display: block !important; /* Forza la visibilità dei tasti */
+        /* Pulsanti */
+        button, .btn-link { 
+            padding: 10px 15px; font-size: 14px; 
+            background: #444; color: white; border: 1px solid #666; 
+            border-radius: 5px; cursor: pointer; text-decoration: none;
         }
-
-        button { 
-            padding: 15px 30px; 
-            font-size: 18px; 
-            background: #ff4444; 
-            color: white; 
-            border: none; 
-            border-radius: 8px; 
-            cursor: pointer;
-            margin: 5px;
-        }
+        button:hover, .btn-link:hover { background: #666; }
+        .btn-download { background: #28a745; border-color: #1e7e34; }
+        
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
     </style>
 </head>
 <body>
 
-    <div id="loading">Caricamento pagine: <span id="percent">0</span>%</div>
+    <div class="toolbar">
+        <button onclick="changeZoom(-0.1)">➖ Rimpicciolisci</button>
+        <button onclick="changeZoom(0.1)">➕ Ingrandisci</button>
+        <button onclick="$('#flipbook').turn('previous')">← Prec</button>
+        <button onclick="$('#flipbook').turn('next')">Succ →</button>
+        <a href="./documento.pdf" download="catalogo.pdf" class="btn-link btn-download">⬇️ Scarica PDF</a>
+    </div>
+
+    <div id="loading">Caricamento: <span id="percent">0</span>%</div>
     
     <div id="canvas-container">
         <div id="flipbook"></div>
     </div>
 
-    <div class="controls">
-        <button id="prevBtn">← PREC</button>
-        <button id="nextBtn">SUCC →</button>
-    </div>
-
     <script>
+        let currentZoom = 1.0;
         const url = './documento.pdf';
         const pdfjsLib = window['pdfjs-dist/build/pdf'];
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        // Funzione Zoom
+        function changeZoom(delta) {
+            currentZoom += delta;
+            if (currentZoom < 0.5) currentZoom = 0.5;
+            if (currentZoom > 2.0) currentZoom = 2.0;
+            document.getElementById('canvas-container').style.transform = `scale(${currentZoom})`;
+        }
 
         async function renderPDF() {
             try {
@@ -66,7 +79,7 @@
 
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
-                    const viewport = page.getViewport({ scale: 0.8 });
+                    const viewport = page.getViewport({ scale: 1.2 }); // Rendering alta qualità
                     
                     const pageDiv = $('<div class="page"></div>');
                     const canvas = document.createElement('canvas');
@@ -82,7 +95,6 @@
 
                 $('#loading').hide();
                 
-                // INIZIALIZZIAMO IL LIBRO
                 const w = fb.find('canvas')[0].width;
                 const h = fb.find('canvas')[0].height;
 
@@ -91,16 +103,13 @@
                     height: h,
                     autoCenter: true,
                     display: 'double',
-                    acceleration: true
+                    acceleration: true,
+                    gradients: true,
+                    elevation: 50
                 });
 
-                // AGGANCIO BOTTONI
-                $('#prevBtn').on('click', function() { $('#flipbook').turn('previous'); });
-                $('#nextBtn').on('click', function() { $('#flipbook').turn('next'); });
-
             } catch (err) {
-                console.error(err);
-                $('#loading').text("Errore. Verifica che il file si chiami documento.pdf");
+                $('#loading').text("Errore. Controlla il file PDF.");
             }
         }
 
