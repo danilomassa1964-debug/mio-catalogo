@@ -63,7 +63,20 @@
         const url = './documento.pdf';
         const pdfjsLib = window['pdfjs-dist/build/pdf'];
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+const loadingTask = pdfjsLib.getDocument({
+    url: url,
+    disableAutoFetch: true, // Non scaricare tutto subito
+    disableStream: false,    // Abilita lo streaming (fondamentale!)
+    rangeChunkSize: 65536    // Carica a pezzetti da 64KB
+});
 
+loadingTask.promise.then(pdf => {
+    console.log("Catalogo ottimizzato: prima pagina in arrivo!");
+    // Qui dovrebbe esserci la tua funzione che renderizza la pagina, es:
+    renderPage(1); 
+}).catch(err => {
+    console.error("Errore nel caricamento streaming: ", err);
+});
         // Funzione Zoom
         function changeZoom(delta) {
             currentZoom += delta;
@@ -124,4 +137,5 @@ function downloadPDF() {
     </script>
 </body>
 </html>
+
 
