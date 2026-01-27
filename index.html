@@ -60,14 +60,26 @@
 
     <script>
         let currentZoom = 1.0;
-        const url = './documento.pdf';
+       const url = './documento.pdf?v=' + new Date().getTime();
         const pdfjsLib = window['pdfjs-dist/build/pdf'];
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 const loadingTask = pdfjsLib.getDocument({
     url: url,
-    disableAutoFetch: true, // Non scaricare tutto subito
-    disableStream: false,    // Abilita lo streaming (fondamentale!)
-    rangeChunkSize: 65536    // Carica a pezzetti da 64KB
+    disableAutoFetch: true, 
+    disableStream: false,   
+    rangeChunkSize: 65536   
+});
+
+loadingTask.promise.then(pdf => {
+    // Questo conferma che lo streaming sta funzionando
+    console.log("PDF agganciato! Pagine totali:", pdf.numPages);
+    
+    // Ora il codice deve caricare la prima pagina
+    // Assicurati che sotto ci sia la tua funzione per renderizzare (es. renderPage(1))
+    pdfDoc = pdf; 
+    renderPage(1); 
+}).catch(function (error) {
+    console.error("Errore durante lo streaming del PDF:", error);
 });
 
 loadingTask.promise.then(pdf => {
@@ -137,5 +149,6 @@ function downloadPDF() {
     </script>
 </body>
 </html>
+
 
 
