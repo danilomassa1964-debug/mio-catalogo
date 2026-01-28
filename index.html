@@ -1,108 +1,62 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <title>Catalogo Serigrafia</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
-
-    <style>
-        body { background-color: #1a1a1a; color: white; text-align: center; font-family: sans-serif; margin: 0; overflow: hidden; }
-        .toolbar {
-            background: rgba(0,0,0,0.9);
-            padding: 10px;
-            position: fixed;
-            top: 0; width: 100%;
-            z-index: 1000;
-            display: flex; justify-content: center; gap: 10px;
-        }
-        #canvas-container { 
-            margin-top: 70px;
-            transition: transform 0.3s ease;
-            transform-origin: center top;
-        }
-        #flipbook { margin: 0 auto; display: none; }
-        .page { background-color: white; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        canvas { width: 100%; height: 100%; display: block; }
-        button { 
-            padding: 10px 15px; font-size: 14px; 
-            background: #333; color: white; border: 1px solid #555; 
-            border-radius: 5px; cursor: pointer;
-        }
-        #loading { 
-            position: absolute; top: 50%; left: 50%; 
-            transform: translate(-50%, -50%); 
-            z-index: 2000;
-            background: rgba(0,0,0,0.85);
-            padding: 25px; border-radius: 15px;
-        }
-    </style>
-</head>
-<body>
-
-    <div class="toolbar">
-        <button onclick="changeZoom(-0.1)">➖</button>
-        <button onclick="changeZoom(0.1)">➕</button>
-        <button onclick="$('#flipbook').turn('previous')">← Prec</button>
-        <button onclick="$('#flipbook').turn('next')">Succ →</button>
-        <button onclick="window.open('./documento.pdf', '_blank')" style="background:#28a745">Scarica PDF</button>
-    </div>
-
-    <div id="loading">Preparazione catalogo...</div>
-    
-    <div id="canvas-container">
-        <div id="flipbook"></div>
-    </div>
-
-    <script>
-        let currentZoom = 1.0;
+let currentZoom = 1.0;
         let pdfDoc = null;
-        // Rimuoviamo il timestamp per evitare problemi di cache durante i test
         const url = 'documento.pdf'; 
         const pdfjsLib = window['pdfjs-dist/build/pdf'];
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
         function changeZoom(delta) {
             currentZoom += delta;
-            if (currentZoom < 0.5) currentZoom = 0.5;
+            if (currentZoom < 0.2) currentZoom = 0.2;
             document.getElementById('canvas-container').style.transform = `scale(${currentZoom})`;
         }
 
         async function init() {
             try {
-                // Caricamento standard (più stabile per file puliti)
                 const loadingTask = pdfjsLib.getDocument(url);
-                
                 pdfDoc = await loadingTask.promise;
                 const fb = $('#flipbook');
                 const totalPages = pdfDoc.numPages;
 
-                // Creazione rapida struttura
                 for (let i = 1; i <= totalPages; i++) {
                     fb.append(`<div class="page" id="page-${i}"><canvas></canvas></div>`);
                 }
 
-                // Prendiamo le misure dalla pagina 1
                 const firstPage = await pdfDoc.getPage(1);
-                const viewport = firstPage.getViewport({ scale: 1.5 });
+                // Usiamo una scala di base più piccola (1.0) per non esagerare con i pixel
+                const viewport = firstPage.getViewport({ scale: 1.0 });
                 
-                // Avvio Flipbook
+                // CALCOLO DIMENSIONI: Se il doppio della pagina è più largo del 90% dello schermo, ridimensioniamo
+                let maxWidth = window.innerWidth * 0.9;
+                let finalWidth = viewport.width * 2;
+                let finalHeight = viewport.height;
+
+                if (finalWidth > maxWidth) {
+                    let ratio = maxWidth / finalWidth;
+                    finalWidth = maxWidth;
+                    finalHeight = viewport.height * ratio;
+                }
+
                 fb.show().turn({
-                    width: viewport.width * 2,
-                    height: viewport.height,
-                    autoCenter: true,
+                    width: finalWidth,
+                    height: finalHeight,
+                    autoCenter: true, // Questo centra il libro rispetto al contenitore
                     display: 'double',
+                    acceleration: true,
+                    elevation: 50,
                     pages: totalPages,
                     when: {
-                        turning: function(e, page) {
+                        turning: function(e, page, view) {
                             renderP(page);
                             if (page + 1 <= totalPages) renderP(page + 1);
+                        },
+                        turned: function(e, page) {
+                            // Se siamo alla pagina 1, Turn.js gestisce il centramento 
+                            // ma forziamo la logica se necessario
+                            console.log("Pagina attuale:", page);
                         }
                     }
                 });
 
-                // Renderizza subito le prime due pagine
                 await renderP(1);
                 await renderP(2);
                 
@@ -110,7 +64,7 @@
 
             } catch (err) {
                 console.error(err);
-                $('#loading').text("Errore caricamento PDF. Verifica che il file 'documento.pdf' sia nella cartella.");
+                $('#loading').text("Errore. Verifica il file PDF.");
             }
         }
 
@@ -121,6 +75,9 @@
             const page = await pdfDoc.getPage(num);
             const canvas = pageDiv.find('canvas')[0];
             const context = canvas.getContext('2d');
+            
+            // Renderizziamo a 1.5 per mantenere nitidezza nello zoom, 
+            // ma il CSS lo terrà nelle dimensioni del flipbook
             const viewport = page.getViewport({ scale: 1.5 });
 
             canvas.width = viewport.width;
@@ -131,6 +88,3 @@
         }
 
         $(document).ready(init);
-    </script>
-</body>
-</html>
