@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Catalogo Interattivo Serigrafia</title>
+    <title>Catalogo Serigrafia</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
@@ -16,7 +16,6 @@
             top: 0; width: 100%;
             z-index: 1000;
             display: flex; justify-content: center; gap: 10px;
-            border-bottom: 1px solid #444;
         }
         #canvas-container { 
             margin-top: 70px;
@@ -31,33 +30,26 @@
             background: #333; color: white; border: 1px solid #555; 
             border-radius: 5px; cursor: pointer;
         }
-        button:hover { background: #555; }
-        .btn-download { background: #28a745; border-color: #1e7e34; }
         #loading { 
             position: absolute; top: 50%; left: 50%; 
             transform: translate(-50%, -50%); 
             z-index: 2000;
-            background: rgba(0,0,0,0.8);
-            padding: 25px;
-            border-radius: 15px;
-            border: 1px solid #444;
+            background: rgba(0,0,0,0.85);
+            padding: 25px; border-radius: 15px;
         }
     </style>
 </head>
 <body>
 
     <div class="toolbar">
-        <button onclick="changeZoom(-0.1)">➖ Rimpicciolisci</button>
-        <button onclick="changeZoom(0.1)">➕ Ingrandisci</button>
+        <button onclick="changeZoom(-0.1)">➖</button>
+        <button onclick="changeZoom(0.1)">➕</button>
         <button onclick="$('#flipbook').turn('previous')">← Prec</button>
         <button onclick="$('#flipbook').turn('next')">Succ →</button>
-        <button onclick="window.open('./documento.pdf', '_blank')" class="btn-download">⬇️ Scarica PDF</button>
+        <button onclick="window.open('./documento.pdf', '_blank')" style="background:#28a745">Scarica PDF</button>
     </div>
 
-    <div id="loading">
-        <div style="margin-bottom:10px;">Preparazione Catalogo...</div>
-        <span id="percent">0</span>%
-    </div>
+    <div id="loading">Preparazione catalogo...</div>
     
     <div id="canvas-container">
         <div id="flipbook"></div>
@@ -66,33 +58,79 @@
     <script>
         let currentZoom = 1.0;
         let pdfDoc = null;
-        // Il timestamp forza il browser a non usare versioni vecchie in cache
-        const url = './documento.pdf?v=' + new Date().getTime();
+        // Rimuoviamo il timestamp per evitare problemi di cache durante i test
+        const url = 'documento.pdf'; 
         const pdfjsLib = window['pdfjs-dist/build/pdf'];
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
         function changeZoom(delta) {
             currentZoom += delta;
             if (currentZoom < 0.5) currentZoom = 0.5;
-            if (currentZoom > 2.0) currentZoom = 2.0;
             document.getElementById('canvas-container').style.transform = `scale(${currentZoom})`;
         }
 
-        async function initCatalogue() {
+        async function init() {
             try {
-                // Configurazione estrema per forzare il codice 206 e lo streaming
-                const loadingTask = pdfjsLib.getDocument({
-                    url: url,
-                    disableAutoFetch: true, 
-                    disableStream: false,   
-                    disableRange: false,    // FORZA il caricamento a pezzi (Range Requests)
-                    rangeChunkSize: 65536   
-                });
-
+                // Caricamento standard (più stabile per file puliti)
+                const loadingTask = pdfjsLib.getDocument(url);
+                
                 pdfDoc = await loadingTask.promise;
                 const fb = $('#flipbook');
                 const totalPages = pdfDoc.numPages;
 
-                // Creiamo la struttura delle pagine
+                // Creazione rapida struttura
                 for (let i = 1; i <= totalPages; i++) {
-                    fb
+                    fb.append(`<div class="page" id="page-${i}"><canvas></canvas></div>`);
+                }
+
+                // Prendiamo le misure dalla pagina 1
+                const firstPage = await pdfDoc.getPage(1);
+                const viewport = firstPage.getViewport({ scale: 1.5 });
+                
+                // Avvio Flipbook
+                fb.show().turn({
+                    width: viewport.width * 2,
+                    height: viewport.height,
+                    autoCenter: true,
+                    display: 'double',
+                    pages: totalPages,
+                    when: {
+                        turning: function(e, page) {
+                            renderP(page);
+                            if (page + 1 <= totalPages) renderP(page + 1);
+                        }
+                    }
+                });
+
+                // Renderizza subito le prime due pagine
+                await renderP(1);
+                await renderP(2);
+                
+                $('#loading').fadeOut();
+
+            } catch (err) {
+                console.error(err);
+                $('#loading').text("Errore caricamento PDF. Verifica che il file 'documento.pdf' sia nella cartella.");
+            }
+        }
+
+        async function renderP(num) {
+            const pageDiv = $(`#page-${num}`);
+            if (pageDiv.hasClass('loaded') || num > pdfDoc.numPages || num < 1) return;
+
+            const page = await pdfDoc.getPage(num);
+            const canvas = pageDiv.find('canvas')[0];
+            const context = canvas.getContext('2d');
+            const viewport = page.getViewport({ scale: 1.5 });
+
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+            pageDiv.addClass('loaded');
+        }
+
+        $(document).ready(init);
+    </script>
+</body>
+</html>
