@@ -2,44 +2,46 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Catalogo Interattivo</title>
+    <title>Catalogo Interattivo Serigrafia</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
 
     <style>
         body { background-color: #1a1a1a; color: white; text-align: center; font-family: sans-serif; margin: 0; overflow: hidden; }
-        
-        /* Toolbar Superiore */
         .toolbar {
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             padding: 10px;
             position: fixed;
             top: 0; width: 100%;
             z-index: 1000;
             display: flex; justify-content: center; gap: 10px;
+            border-bottom: 1px solid #444;
         }
-
         #canvas-container { 
-            margin-top: 60px;
-            transition: transform 0.3s ease; /* Per lo zoom fluido */
+            margin-top: 70px;
+            transition: transform 0.3s ease;
             transform-origin: center top;
         }
-
         #flipbook { margin: 0 auto; display: none; }
         .page { background-color: white; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        canvas { width: 100%; height: 100%; }
-
-        /* Pulsanti */
-        button, .btn-link { 
+        canvas { width: 100%; height: 100%; display: block; }
+        button { 
             padding: 10px 15px; font-size: 14px; 
-            background: #444; color: white; border: 1px solid #666; 
-            border-radius: 5px; cursor: pointer; text-decoration: none;
+            background: #333; color: white; border: 1px solid #555; 
+            border-radius: 5px; cursor: pointer;
         }
-        button:hover, .btn-link:hover { background: #666; }
+        button:hover { background: #555; }
         .btn-download { background: #28a745; border-color: #1e7e34; }
-        
-        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        #loading { 
+            position: absolute; top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            z-index: 2000;
+            background: rgba(0,0,0,0.8);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid #444;
+        }
     </style>
 </head>
 <body>
@@ -49,10 +51,13 @@
         <button onclick="changeZoom(0.1)">➕ Ingrandisci</button>
         <button onclick="$('#flipbook').turn('previous')">← Prec</button>
         <button onclick="$('#flipbook').turn('next')">Succ →</button>
-        <button onclick="downloadPDF()" class="btn-download">⬇️ Scarica PDF</button>
+        <button onclick="window.open('./documento.pdf', '_blank')" class="btn-download">⬇️ Scarica PDF</button>
     </div>
 
-    <div id="loading">Caricamento: <span id="percent">0</span>%</div>
+    <div id="loading">
+        <div style="margin-bottom:10px;">Preparazione Catalogo...</div>
+        <span id="percent">0</span>%
+    </div>
     
     <div id="canvas-container">
         <div id="flipbook"></div>
@@ -60,92 +65,34 @@
 
     <script>
         let currentZoom = 1.0;
-       const url = './documento.pdf?v=' + new Date().getTime();
+        let pdfDoc = null;
+        // Il timestamp forza il browser a non usare versioni vecchie in cache
+        const url = './documento.pdf?v=' + new Date().getTime();
         const pdfjsLib = window['pdfjs-dist/build/pdf'];
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-const loadingTask = pdfjsLib.getDocument({
-    url: url,
-    disableAutoFetch: true, 
-    disableStream: false,   
-    rangeChunkSize: 65536   
-});
 
-loadingTask.promise.then(pdf => {
-    // Questo conferma che lo streaming sta funzionando
-    console.log("PDF agganciato! Pagine totali:", pdf.numPages);
-    
-    // Ora il codice deve caricare la prima pagina
-    // Assicurati che sotto ci sia la tua funzione per renderizzare (es. renderPage(1))
-    pdfDoc = pdf; 
-    renderPage(1); 
-}).catch(function (error) {
-    console.error("Errore durante lo streaming del PDF:", error);
-});
-
-loadingTask.promise.then(pdf => {
-    console.log("Catalogo ottimizzato: prima pagina in arrivo!");
-    // Qui dovrebbe esserci la tua funzione che renderizza la pagina, es:
-    renderPage(1); 
-}).catch(err => {
-    console.error("Errore nel caricamento streaming: ", err);
-});
-        // Funzione Zoom
         function changeZoom(delta) {
             currentZoom += delta;
             if (currentZoom < 0.5) currentZoom = 0.5;
             if (currentZoom > 2.0) currentZoom = 2.0;
             document.getElementById('canvas-container').style.transform = `scale(${currentZoom})`;
         }
-function downloadPDF() {
-    const link = document.createElement('a');
-    link.href = './documento.pdf';
-    link.download = 'Catalogo.pdf'; // Il nome che vedrà l'utente al download
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-        async function renderPDF() {
+
+        async function initCatalogue() {
             try {
-                const pdf = await pdfjsLib.getDocument(url).promise;
-                const fb = $('#flipbook');
-
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const viewport = page.getViewport({ scale: 1.2 }); // Rendering alta qualità
-                    
-                    const pageDiv = $('<div class="page"></div>');
-                    const canvas = document.createElement('canvas');
-                    canvas.width = viewport.width;
-                    canvas.height = viewport.height;
-                    
-                    pageDiv.append(canvas);
-                    fb.append(pageDiv);
-
-                    await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
-                    $('#percent').text(Math.round((i / pdf.numPages) * 100));
-                }
-
-                $('#loading').hide();
-                
-                const w = fb.find('canvas')[0].width;
-                const h = fb.find('canvas')[0].height;
-
-                fb.show().turn({
-                    width: w * 2,
-                    height: h,
-                    autoCenter: true,
-                    display: 'double',
-                    acceleration: true,
-                    gradients: true,
-                    elevation: 50
+                // Configurazione estrema per forzare il codice 206 e lo streaming
+                const loadingTask = pdfjsLib.getDocument({
+                    url: url,
+                    disableAutoFetch: true, 
+                    disableStream: false,   
+                    disableRange: false,    // FORZA il caricamento a pezzi (Range Requests)
+                    rangeChunkSize: 65536   
                 });
 
-            } catch (err) {
-                $('#loading').text("Errore. Controlla il file PDF.");
-            }
-        }
+                pdfDoc = await loadingTask.promise;
+                const fb = $('#flipbook');
+                const totalPages = pdfDoc.numPages;
 
-        $(document).ready(renderPDF);
-    </script>
-</body>
-</html>
+                // Creiamo la struttura delle pagine
+                for (let i = 1; i <= totalPages; i++) {
+                    fb
