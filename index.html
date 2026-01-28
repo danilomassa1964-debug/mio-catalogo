@@ -1,84 +1,57 @@
-let pdfDoc = null;
-        const url = 'https://catalogs-online.com/catalog/12/
-        const pdfjsLib = window['pdfjs-dist/build/pdf'];
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-
-        function changeZoom(delta) {
-            let currentScale = parseFloat($('#canvas-container').css('transform').split(',')[3]) || 1;
-            let newScale = currentScale + delta;
-            if (newScale > 0.2) {
-                $('#canvas-container').css('transform', `scale(${newScale})`).css('transform-origin', 'top center');
-            }
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Il Nostro Catalogo</title>
+    <style>
+        /* Rimuove margini e scrollbar della tua pagina */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background-color: #000;
         }
 
-        async function init() {
-            try {
-                const loadingTask = pdfjsLib.getDocument(url);
-                pdfDoc = await loadingTask.promise;
-                const fb = $('#flipbook');
-
-                const firstPage = await pdfDoc.getPage(1);
-                const viewport = firstPage.getViewport({ scale: 1.0 });
-
-                // CALCOLO DIMENSIONI RESPONSIVE
-                const screenWidth = window.innerWidth * 0.9;
-                const screenHeight = window.innerHeight * 0.8;
-                let ratio = Math.min(screenWidth / (viewport.width * 2), screenHeight / viewport.height);
-                
-                const pageWidth = viewport.width * ratio;
-                const bookHeight = viewport.height * ratio;
-
-                for (let i = 1; i <= pdfDoc.numPages; i++) {
-                    fb.append(`<div class="page" id="page-${i}"><canvas></canvas></div>`);
-                }
-
-                fb.show().turn({
-                    width: pageWidth * 2,
-                    height: bookHeight,
-                    autoCenter: true, 
-                    display: 'double',
-                    acceleration: true,
-                    elevation: 50,
-                    when: {
-                        turning: function(e, page, view) {
-                            renderPage(page);
-                            if (page + 1 <= pdfDoc.numPages) renderPage(page + 1);
-                        },
-                        // QUESTA FUNZIONE FORZA IL CENTRAMENTO DELLA COPERTINA
-                        start: function(e, pageObj) {
-                            if (pageObj.next == 1) $(this).turn('center');
-                        }
-                    }
-                });
-
-                // Forza il centramento iniziale sulla pagina 1
-                fb.turn('center');
-
-                await renderPage(1);
-                await renderPage(2);
-                $('#loading').fadeOut();
-
-            } catch (err) {
-                console.error(err);
-                $('#loading').text("Errore caricamento.");
-            }
+        /* Rende il catalogo del fornitore a tutto schermo */
+        #catalogo-frame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
         }
 
-        async function renderPage(num) {
-            const pageDiv = $(`#page-${num}`);
-            if (pageDiv.hasClass('loaded') || num > pdfDoc.numPages || num < 1) return;
-
-            const page = await pdfDoc.getPage(num);
-            const canvas = pageDiv.find('canvas')[0];
-            const context = canvas.getContext('2d');
-            const viewport = page.getViewport({ scale: 1.5 });
-
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-
-            await page.render({ canvasContext: context, viewport: viewport }).promise;
-            pageDiv.addClass('loaded');
+        /* Opzionale: un tasto per tornare alla tua Home se vuoi */
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 999;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 10px 15px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-family: sans-serif;
+            font-size: 12px;
+            border: 1px solid #555;
         }
+        .back-button:hover { background: #000; }
+    </style>
+</head>
+<body>
 
-        $(document).ready(init);
+    <a href="/" class="back-button">← Torna al Sito</a>
 
+    <iframe 
+        id="catalogo-frame" 
+        src="https://catalogs-online.com/catalog/12/" 
+        allowfullscreen>
+    </iframe>
+
+</body>
+</html>
